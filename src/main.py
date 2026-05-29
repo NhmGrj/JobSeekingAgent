@@ -1,6 +1,7 @@
 from scraper import scrape_jobs, login
 from evaluator import evaluate_job
 from database import init_db, is_seen, mark_seen
+from reporter import send_telegram
 from playwright.sync_api import sync_playwright
 from datetime import datetime
 
@@ -21,6 +22,7 @@ def main():
 
     if not new_jobs:
         print("Aucune nouvelle offre aujourd'hui !")
+        send_telegram([])
         return
 
     results = []
@@ -47,5 +49,6 @@ def main():
                     f.write(f"- **URL:** {job['url']}\n\n")
 
     print(f"\nRésultats sauvegardés dans {output_path}")
+    send_telegram(results)
 
 main()
