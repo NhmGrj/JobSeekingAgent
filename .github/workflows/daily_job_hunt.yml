@@ -1,4 +1,4 @@
-name: Daily Job Hunt
+name: Daily Job Hunt (Fixed)
 
 on:
   schedule:
@@ -20,13 +20,20 @@ jobs:
         with:
           python-version: '3.12'
 
-      # Nettoyage du cache APT
-      - name: Clean APT cache
-        run: sudo apt-get clean && sudo apt-get update
+      # Nettoyage AGRESSIF du cache APT
+      - name: Clean and update APT
+        run: |
+          sudo apt-get clean
+          sudo apt-get update --fix-missing
+          sudo apt-get autoremove -y
+          sudo rm -rf /var/lib/apt/lists/*
 
-      # Installation des dépendances système (avec les deux alternatives pour libasound2)
+      # Installation FORCÉE des dépendances (avec les deux alternatives)
       - name: Install Playwright system dependencies
-        run: sudo apt-get update && sudo apt-get install -y libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2t64 liboss4-salsa-asound2
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --fix-broken libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2t64 liboss4-salsa-asound2 || true
+          sudo apt-get install -y libasound2t64 liboss4-salsa-asound2
 
       - name: Install Python dependencies
         run: |
@@ -46,11 +53,7 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           cd src
-          python -u main.py 2>&1 | tee ../output.log || echo "Exit code: ${PIPESTATUS[0]}"
-
-      - name: Display logs on failure
-        if: failure()
-        run: cat ../output.log
+          python -u main.py 2>&1 | tee ../output.log
 
       - name: Upload results
         uses: actions/upload-artifact@v4
