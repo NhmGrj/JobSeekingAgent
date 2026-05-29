@@ -1,10 +1,12 @@
 from scraper import scrape_jobs, login
 from evaluator import evaluate_job
+from database import init_db, is_seen, mark_seen
 from playwright.sync_api import sync_playwright
 from datetime import datetime
-import os
 
 def main():
+    init_db()
+
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
@@ -13,19 +15,21 @@ def main():
         jobs = scrape_jobs(page, "https://www.welcometothejungle.com/fr/jobs-matches")
         browser.close()
 
-    print(f"\nÉvaluation de {len(jobs)} offres...\n")
+    new_jobs = [job for job in jobs if job['title'] != "N/A" and not is_seen(job['url'])]
+
+    print(f"\n{len(jobs) - 1} offres trouvées, {len(new_jobs)} nouvelles à évaluer\n")
+
+    if not new_jobs:
+        print("Aucune nouvelle offre aujourd'hui !")
+        return
 
     results = []
-    for job in jobs:
-        if job['title'] == "N/A":
-            continue
-
+    for job in new_jobs:
         result = evaluate_job(job)
+        mark_seen(job['url'], job['title'], job['company'])
         results.append((job, result))
-
         print(f"{result['verdict']} ({result['score']}/10) — {job['title']} @ {job['company']}")
 
-    # Write results to file
     date_str = datetime.now().strftime("%Y-%m-%d_%H-%M")
     output_path = f"../results_{date_str}.md"
 
