@@ -36,7 +36,6 @@ def scrape_jobs(page, search_url: str) -> list[dict]:
     page.wait_for_load_state("domcontentloaded")
     page.wait_for_selector('[data-testid="job-card-tag-location"]', timeout=10000)
     page.wait_for_timeout(2000)
-    page.screenshot(path="debug.png")
 
     jobs = []
     cards = page.query_selector_all(".bg-neutral-10.rounded-xl")
@@ -60,21 +59,3 @@ def scrape_jobs(page, search_url: str) -> list[dict]:
         })
 
     return jobs
-
-def main():
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
-
-        login(page)
-
-        jobs = scrape_jobs(page, "https://www.welcometothejungle.com/fr/jobs-matches")
-
-        for job in jobs:
-            print(f"\n{job['title']} — {job['company']}")
-            print(f"  {job['location']} | {job['contract']} | {job['remote']}")
-            print(f"  {job['url']}")
-
-        browser.close()
-
-main()
