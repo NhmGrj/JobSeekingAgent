@@ -1,0 +1,39 @@
+name: Daily Job Hunt
+
+on:
+  schedule:
+    - cron: '0 7 * * *'  # Every day at 7am UTC (9am Paris time)
+  workflow_dispatch:  # Allows manual trigger from GitHub
+
+jobs:
+  hunt:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          playwright install chromium
+          playwright install-deps chromium
+
+      - name: Run job hunter
+        env:
+          WTTJ_EMAIL: ${{ secrets.WTTJ_EMAIL }}
+          WTTJ_PASSWORD: ${{ secrets.WTTJ_PASSWORD }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+        run: |
+          cd src && python main.py
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: job-results
+          path: results_*.md
