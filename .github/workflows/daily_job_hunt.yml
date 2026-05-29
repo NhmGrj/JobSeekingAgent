@@ -20,26 +20,13 @@ jobs:
         with:
           python-version: '3.12'
 
-      # Nettoyage AGRESSIF du cache APT
-      - name: Clean and update APT
-        run: |
-          sudo apt-get clean
-          sudo apt-get update --fix-missing
-          sudo apt-get autoremove -y
-          sudo rm -rf /var/lib/apt/lists/*
-
-      # Installation FORCÉE des dépendances (avec les deux alternatives)
-      - name: Install Playwright system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --fix-broken libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2t64 liboss4-salsa-asound2 || true
-          sudo apt-get install -y libasound2t64 liboss4-salsa-asound2
-
       - name: Install Python dependencies
         run: |
           pip install -r requirements.txt
-          playwright install chromium
-          playwright install-deps chromium
+
+      - name: Install Playwright + system dependencies
+        run: |
+          playwright install --with-deps chromium
 
       - name: Create results directory
         run: mkdir -p results
