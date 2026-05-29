@@ -3,7 +3,7 @@ name: Daily Job Hunt
 on:
   schedule:
     - cron: '0 7 * * *'  # Exécution à 7h tous les jours
-  workflow_dispatch:
+  workflow_dispatch:      # Déclenchement manuel
 
 jobs:
   hunt:
@@ -26,27 +26,44 @@ jobs:
       - name: Install Playwright system dependencies
         run: sudo apt-get update && sudo apt-get install -y libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2
 
-      # 4. Installe les dépendances Python (via requirements.txt)
+      # 4. Installe les dépendances Python et Playwright
       - name: Install Python dependencies
         run: |
           pip install -r requirements.txt
           playwright install chromium
           playwright install-deps chromium
 
-      # 5. Exécute ton script
+      # 5. Crée un dossier pour les résultats (si nécessaire)
+      - name: Create results directory
+        run: mkdir -p results
+
+      # 6. Exécute ton script avec débogage
       - name: Run job hunter
         env:
           WTTJ_EMAIL: ${{ secrets.WTTJ_EMAIL }}
           WTTJ_PASSWORD: ${{ secrets.WTTJ_PASSWORD }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}  # Ajouté pour reporter.py
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}      # Ajouté pour reporter.py
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          cd src && python main.py
+          cd src
+          echo "=== Début de l'exécution ==="
+          python -u main.py 2>&1 | tee ../output.log || echo "Exit code: ${PIPESTATUS[0]}"
+          echo "=== Fin de l'exécution ==="
 
-      # 6. Upload des résultats
+      # 7. Affiche les logs en cas d'erreur
+      - name: Display logs on failure
+        if: failure()
+        run: |
+          echo "=== Logs du script ==="
+          cat ../output.log
+
+      # 8. Upload des résultats (même en cas d'erreur)
       - name: Upload results
         uses: actions/upload-artifact@v4
+        if: always()  # Upload même si le script échoue
         with:
           name: job-results
-          path: results_*.md
+          path: |
+            results/
+            output.log
