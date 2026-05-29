@@ -22,9 +22,9 @@ jobs:
         with:
           python-version: '3.12'
 
-      # 3. Installe les dépendances système pour Playwright
+      # 3. Installe les dépendances système pour Playwright (corrigé pour Ubuntu 24.04)
       - name: Install Playwright system dependencies
-        run: sudo apt-get update && sudo apt-get install -y libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2
+        run: sudo apt-get update && sudo apt-get install -y libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2t64
 
       # 4. Installe les dépendances Python et Playwright
       - name: Install Python dependencies
@@ -61,7 +61,7 @@ jobs:
       # 8. Upload des résultats (même en cas d'erreur)
       - name: Upload results
         uses: actions/upload-artifact@v4
-        if: always()  # Upload même si le script échoue
+        if: always()
         with:
           name: job-results
           path: |
