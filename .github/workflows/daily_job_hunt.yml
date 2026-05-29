@@ -2,7 +2,7 @@ name: Daily Job Hunt
 
 on:
   schedule:
-    - cron: '0 7 * * *'
+    - cron: '0 7 * * *'  # Exécution à 7h tous les jours
   workflow_dispatch:
 
 jobs:
@@ -12,28 +12,39 @@ jobs:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
+      # 1. Récupère le code du dépôt
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # 2. Configure Python (version 3.12)
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: Install dependencies
+      # 3. Installe les dépendances système pour Playwright
+      - name: Install Playwright system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2
+
+      # 4. Installe les dépendances Python (via requirements.txt)
+      - name: Install Python dependencies
         run: |
           pip install -r requirements.txt
           playwright install chromium
           playwright install-deps chromium
 
+      # 5. Exécute ton script
       - name: Run job hunter
         env:
           WTTJ_EMAIL: ${{ secrets.WTTJ_EMAIL }}
           WTTJ_PASSWORD: ${{ secrets.WTTJ_PASSWORD }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}  # Ajouté pour reporter.py
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}      # Ajouté pour reporter.py
         run: |
           cd src && python main.py
 
+      # 6. Upload des résultats
       - name: Upload results
         uses: actions/upload-artifact@v4
         with:
