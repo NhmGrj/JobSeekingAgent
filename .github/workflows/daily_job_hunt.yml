@@ -2,12 +2,14 @@ name: Daily Job Hunt
 
 on:
   schedule:
-    - cron: '0 7 * * *'  # Every day at 7am UTC (9am Paris time)
-  workflow_dispatch:  # Allows manual trigger from GitHub
+    - cron: '0 7 * * *'
+  workflow_dispatch:
 
 jobs:
   hunt:
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Checkout code
