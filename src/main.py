@@ -4,6 +4,7 @@ from database import init_db, is_seen, mark_seen
 from reporter import send_telegram
 from playwright.sync_api import sync_playwright
 from datetime import datetime
+import time
 
 def main():
     init_db()
@@ -26,11 +27,13 @@ def main():
         return
 
     results = []
-    for job in new_jobs:
+    for i, job in enumerate(new_jobs):
         result = evaluate_job(job)
         mark_seen(job['url'], job['title'], job['company'])
         results.append((job, result))
         print(f"{result['verdict']} ({result['score']}/10) — {job['title']} @ {job['company']}")
+        if i < len(new_jobs) - 1:
+            time.sleep(3)
 
     date_str = datetime.now().strftime("%Y-%m-%d_%H-%M")
     output_path = f"../results_{date_str}.md"

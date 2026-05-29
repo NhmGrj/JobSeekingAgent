@@ -2,6 +2,7 @@ from mistralai.client import Mistral
 from dotenv import load_dotenv
 import os
 import json
+import time
 
 load_dotenv()
 
@@ -31,7 +32,7 @@ Réponds uniquement en JSON avec ce format :
 }
 """
 
-def evaluate_job(job: dict) -> dict:
+def evaluate_job(job: dict, retries: int = 3, delay: int = 10) -> dict:
     prompt = f"""
 Voici une offre d'emploi :
 - Titre : {job['title']}
@@ -44,17 +45,27 @@ Voici une offre d'emploi :
 Évalue cette offre selon les critères fournis.
 """
 
-    response = client.chat.complete(
-        model="mistral-small-latest",
-        messages=[
-            {"role": "system", "content": CRITERIA},
-            {"role": "user", "content": prompt}
-        ]
-    )
+    for attempt in range(retries):
+        try:
+            response = client.chat.complete(
+                model="mistral-small-latest",
+                messages=[
+                    {"role": "system", "content": CRITERIA},
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            raw = response.choices[0].message.content
+            try:
+                clean = raw.replace("```json", "").replace("```", "").strip()
+                return json.loads(clean)
+            except:
+                return {"score": 0, "explanation": raw, "verdict": "ERREUR"}
 
-    raw = response.choices[0].message.content
-    try:
-        clean = raw.replace("```json", "").replace("```", "").strip()
-        return json.loads(clean)
-    except:
-        return {"score": 0, "explanation": raw, "verdict": "ERREUR"}
+        except Exception as e:
+            if "429" in str(e) and attempt < retries - 1:
+                wait = delay * (attempt + 1)
+                print(f"Rate limit hit, waiting {wait}s before retry ({attempt + 1}/{retries})...")
+                time.sleep(wait)
+            else:
+                print(f"Mistral error: {e}")
+                return {"score": 0, "explanation": str(e), "verdict": "ERREUR"}
