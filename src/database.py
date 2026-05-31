@@ -1,72 +1,29 @@
-name: Daily Job Hunt (Fixed)
+import sqlite3
+import os
 
-on:
-  schedule:
-    - cron: '0 7 * * *'
-  workflow_dispatch:
+DB_PATH = os.path.join(os.path.dirname(__file__), "../seen_jobs.db")
 
-jobs:
-  hunt:
-    runs-on: ubuntu-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS seen_jobs (
+            url TEXT PRIMARY KEY,
+            title TEXT,
+            company TEXT,
+            seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+    conn.close()
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+def is_seen(url: str) -> bool:
+    conn = sqlite3.connect(DB_PATH)
+    result = conn.execute("SELECT 1 FROM seen_jobs WHERE url = ?", (url,)).fetchone()
+    conn.close()
+    return result is not None
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Restore jobs database
-        uses: actions/cache@v4
-        with:
-          path: seen_jobs.db
-          key: seen-jobs-db
-          restore-keys: seen-jobs-db
-
-      - name: Install Python dependencies
-        run: |
-          pip install -r requirements.txt
-
-      - name: Patch libasound2 for Ubuntu Noble
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libasound2t64
-          sudo ln -sf /usr/lib/x86_64-linux-gnu/libasound.so.2 /usr/lib/x86_64-linux-gnu/libasound.so.2.0.0 || true
-
-      - name: Install Playwright + system dependencies
-        run: |
-          playwright install --with-deps chromium
-
-      - name: Create results directory
-        run: mkdir -p results
-
-      - name: Run job hunter
-        env:
-          WTTJ_EMAIL: ${{ secrets.WTTJ_EMAIL }}
-          WTTJ_PASSWORD: ${{ secrets.WTTJ_PASSWORD }}
-          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          cd src
-          python -u main.py 2>&1 | tee ../output.log
-
-      - name: Save jobs database
-        uses: actions/cache/save@v4
-        if: always()
-        with:
-          path: seen_jobs.db
-          key: seen-jobs-db
-
-      - name: Upload results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: job-results
-          path: |
-            results/
-            output.log
+def mark_seen(url: str, title: str, company: str):
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("INSERT OR IGNORE INTO seen_jobs (url, title, company) VALUES (?, ?, ?)", (url, title, company))
+    conn.commit()
+    conn.close()

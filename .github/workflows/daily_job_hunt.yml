@@ -20,6 +20,13 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Restore jobs database
+        uses: actions/cache@v4
+        with:
+          path: seen_jobs.db
+          key: seen-jobs-db
+          restore-keys: seen-jobs-db
+
       - name: Install Python dependencies
         run: |
           pip install -r requirements.txt
@@ -47,6 +54,13 @@ jobs:
         run: |
           cd src
           python -u main.py 2>&1 | tee ../output.log
+
+      - name: Save jobs database
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: seen_jobs.db
+          key: seen-jobs-db
 
       - name: Upload results
         uses: actions/upload-artifact@v4
