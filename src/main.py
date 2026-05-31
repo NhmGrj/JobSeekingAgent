@@ -2,7 +2,7 @@ from scraper import scrape_jobs, login
 from evaluator import evaluate_job
 from database import init_db, is_seen, mark_seen
 from reporter import send_telegram
-from sheet_reporter import append_jobs
+from notion_reporter import append_jobs
 from playwright.sync_api import sync_playwright
 from datetime import datetime
 import time
@@ -41,7 +41,6 @@ def main():
 
     with open(output_path, "w") as f:
         f.write(f"# Résultats du {datetime.now().strftime('%d/%m/%Y %H:%M')}\n\n")
-
         for verdict in ["POSTULER", "PEUT-ÊTRE", "IGNORER"]:
             f.write(f"## {verdict}\n\n")
             for job, result in results:
