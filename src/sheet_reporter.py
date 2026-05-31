@@ -163,13 +163,19 @@ def append_jobs(results: list[tuple]) -> None:
         table_id = get_table_id(spreadsheet, sheet_id)
 
         if table_id is None:
-            # Write header first so table picks up column names
             sheet.append_row([
                 "Date", "Titre", "Entreprise", "Score", "Verdict",
                 "Localisation", "Contrat", "Télétravail", "URL",
                 "Statut", "Prochaine action", "Notes"
             ], value_input_option="RAW")
-            # Write data rows
             sheet.append_rows(rows, value_input_option="USER_ENTERED")
-            # Create table on top of existing data
-            create_table(spreadsheet, sheet, sheet_id, len(ro
+            create_table(spreadsheet, sheet, sheet_id, len(rows))
+            print(f"Google Sheet table created with {len(rows)} jobs.")
+        else:
+            current_row_count = len(sheet.get_all_values())
+            extend_table(spreadsheet, sheet_id, table_id, current_row_count, len(rows))
+            append_to_table(spreadsheet, sheet_id, table_id, rows)
+            print(f"Google Sheet table extended with {len(rows)} new jobs.")
+
+    except Exception as e:
+        print(f"Google Sheet error: {e}")
