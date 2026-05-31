@@ -2,7 +2,7 @@ import gspread
 import os
 import json
 from google.oauth2.service_account import Credentials
-from gspread_formatting import set_column_width, set_frozen
+from gspread_formatting import set_column_width
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -11,11 +11,6 @@ load_dotenv()
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
-]
-
-HEADERS = [
-    "Date", "Titre", "Entreprise", "Score", "Verdict",
-    "Localisation", "Contrat", "Télétravail", "URL", "Statut", "Prochaine action", "Notes"
 ]
 
 def get_credentials():
@@ -45,26 +40,25 @@ def create_table(spreadsheet, sheet, sheet_id, num_rows):
                     "range": {
                         "sheetId": sheet_id,
                         "startRowIndex": 0,
-                        "endRowIndex": num_rows + 1,
+                        "endRowIndex": 1 + num_rows,
                         "startColumnIndex": 0,
                         "endColumnIndex": 12
                     },
                     "columnProperties": [
-                        {"columnIndex": 0, "columnName": "Date", "columnType": "TEXT"},
-                        {"columnIndex": 1, "columnName": "Titre", "columnType": "TEXT"},
-                        {"columnIndex": 2, "columnName": "Entreprise", "columnType": "TEXT"},
-                        {"columnIndex": 3, "columnName": "Score", "columnType": "TEXT"},
-                        {"columnIndex": 4, "columnName": "Verdict", "columnType": "DROPDOWN",
+                        {"columnIndex": 0, "columnType": "TEXT"},
+                        {"columnIndex": 1, "columnType": "TEXT"},
+                        {"columnIndex": 2, "columnType": "TEXT"},
+                        {"columnIndex": 3, "columnType": "TEXT"},
+                        {"columnIndex": 4, "columnType": "DROPDOWN",
                          "dataValidationRule": {"condition": {"type": "ONE_OF_LIST", "values": [
                              {"userEnteredValue": "POSTULER"},
-                             {"userEnteredValue": "PEUT-ÊTRE"},
-                             {"userEnteredValue": "IGNORER"}
+                             {"userEnteredValue": "PEUT-ÊTRE"}
                          ]}}},
-                        {"columnIndex": 5, "columnName": "Localisation", "columnType": "TEXT"},
-                        {"columnIndex": 6, "columnName": "Contrat", "columnType": "TEXT"},
-                        {"columnIndex": 7, "columnName": "Télétravail", "columnType": "TEXT"},
-                        {"columnIndex": 8, "columnName": "URL", "columnType": "TEXT"},
-                        {"columnIndex": 9, "columnName": "Statut", "columnType": "DROPDOWN",
+                        {"columnIndex": 5, "columnType": "TEXT"},
+                        {"columnIndex": 6, "columnType": "TEXT"},
+                        {"columnIndex": 7, "columnType": "TEXT"},
+                        {"columnIndex": 8, "columnType": "TEXT"},
+                        {"columnIndex": 9, "columnType": "DROPDOWN",
                          "dataValidationRule": {"condition": {"type": "ONE_OF_LIST", "values": [
                              {"userEnteredValue": "À postuler"},
                              {"userEnteredValue": "Postulé"},
@@ -73,8 +67,8 @@ def create_table(spreadsheet, sheet, sheet_id, num_rows):
                              {"userEnteredValue": "Offre"},
                              {"userEnteredValue": "Abandonné"}
                          ]}}},
-                        {"columnIndex": 10, "columnName": "Prochaine action", "columnType": "TEXT"},
-                        {"columnIndex": 11, "columnName": "Notes", "columnType": "TEXT"}
+                        {"columnIndex": 10, "columnType": "TEXT"},
+                        {"columnIndex": 11, "columnType": "TEXT"}
                     ]
                 }
             }
@@ -169,14 +163,13 @@ def append_jobs(results: list[tuple]) -> None:
         table_id = get_table_id(spreadsheet, sheet_id)
 
         if table_id is None:
+            # Write header first so table picks up column names
+            sheet.append_row([
+                "Date", "Titre", "Entreprise", "Score", "Verdict",
+                "Localisation", "Contrat", "Télétravail", "URL",
+                "Statut", "Prochaine action", "Notes"
+            ], value_input_option="RAW")
+            # Write data rows
             sheet.append_rows(rows, value_input_option="USER_ENTERED")
-            create_table(spreadsheet, sheet, sheet_id, len(rows))
-            print(f"Google Sheet table created with {len(rows)} jobs.")
-        else:
-            current_row_count = len(sheet.get_all_values())
-            extend_table(spreadsheet, sheet_id, table_id, current_row_count, len(rows))
-            append_to_table(spreadsheet, sheet_id, table_id, rows)
-            print(f"Google Sheet table extended with {len(rows)} new jobs.")
-
-    except Exception as e:
-        print(f"Google Sheet error: {e}")
+            # Create table on top of existing data
+            create_table(spreadsheet, sheet, sheet_id, len(ro
