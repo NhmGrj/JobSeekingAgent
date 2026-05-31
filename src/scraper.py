@@ -60,7 +60,7 @@ def scrape_jobs(page, search_url: str, max_pages: int = 5) -> list[dict]:
             })
 
         try:
-            next_button = page.query_selector('[data-testid="pagination-next-page"]')
+            next_button = page.query_selector('[data-testid="job-list-pagination-arrow-next"]')
             if not next_button or not next_button.is_enabled():
                 print(f"No more pages after page {page_num}")
                 break
