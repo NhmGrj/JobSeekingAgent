@@ -18,7 +18,7 @@ def main():
         jobs = scrape_jobs(page, "https://www.welcometothejungle.com/fr/jobs-matches")
         browser.close()
 
-    new_jobs = [job for job in jobs if job['title'] != "N/A" and not is_seen(job['url'])]
+    new_jobs = [job for job in jobs if job['title'] != "N/A" and not is_seen(job['title'], job['company'])]
 
     print(f"\n{len(jobs) - 1} offres trouvées, {len(new_jobs)} nouvelles à évaluer\n")
 
@@ -52,7 +52,7 @@ def main():
                     f.write(f"- **URL:** {job['url']}\n\n")
 
     print(f"\nRésultats sauvegardés dans {output_path}")
-    #send_telegram(results)
+    send_telegram(results)
     append_jobs(results)
 
 main()
