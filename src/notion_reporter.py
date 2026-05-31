@@ -14,20 +14,6 @@ HEADERS = {
     "Notion-Version": "2022-06-28"
 }
 
-VERDICT_COLORS = {
-    "POSTULER": "green",
-    "PEUT-ÊTRE": "yellow"
-}
-
-STATUT_COLORS = {
-    "À postuler": "blue",
-    "Postulé": "orange",
-    "Entretien": "purple",
-    "Refus": "red",
-    "Offre": "green",
-    "Abandonné": "gray"
-}
-
 def append_jobs(results: list[tuple]) -> None:
     for job, result in results:
         if result["verdict"] not in ["POSTULER", "PEUT-ÊTRE"]:
@@ -48,10 +34,7 @@ def append_jobs(results: list[tuple]) -> None:
                     "number": result["score"]
                 },
                 "Verdict": {
-                    "select": {
-                        "name": result["verdict"],
-                        "color": VERDICT_COLORS.get(result["verdict"], "default")
-                    }
+                    "select": {"name": result["verdict"]}
                 },
                 "Localisation": {
                     "rich_text": [{"text": {"content": job["location"]}}]
@@ -66,10 +49,7 @@ def append_jobs(results: list[tuple]) -> None:
                     "url": job["url"]
                 },
                 "Statut": {
-                    "select": {
-                        "name": statut,
-                        "color": STATUT_COLORS.get(statut, "default")
-                    }
+                    "select": {"name": statut}
                 },
                 "Analyse": {
                     "rich_text": [{"text": {"content": result["explanation"]}}]

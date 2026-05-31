@@ -52,7 +52,7 @@ def main():
                     f.write(f"- **URL:** {job['url']}\n\n")
 
     print(f"\nRésultats sauvegardés dans {output_path}")
-    send_telegram(results)
+    #send_telegram(results)
     append_jobs(results)
 
 main()
