@@ -16,9 +16,9 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-COLOR_POSTULER = Color(0.714, 0.843, 0.659)   # soft green
-COLOR_PEUT_ETRE = Color(1.0, 0.949, 0.667)     # soft yellow
-COLOR_HEADER = Color(0.157, 0.306, 0.475)      # dark blue
+COLOR_POSTULER = Color(0.714, 0.843, 0.659)
+COLOR_PEUT_ETRE = Color(1.0, 0.949, 0.667)
+COLOR_HEADER = Color(0.157, 0.306, 0.475)
 
 def get_sheet():
     credentials_json = os.getenv("GOOGLE_CREDENTIALS")
@@ -28,7 +28,76 @@ def get_sheet():
     sheet_id = os.getenv("GOOGLE_SHEET_ID")
     return client.open_by_key(sheet_id).sheet1
 
-def init_sheet(sheet):
+def add_filters(spreadsheet, sheet):
+    sheet_id = sheet._properties['sheetId']
+    spreadsheet.batch_update({
+        "requests": [{
+            "setBasicFilter": {
+                "filter": {
+                    "range": {
+                        "sheetId": sheet_id,
+                        "startRowIndex": 0,
+                        "startColumnIndex": 0,
+                        "endColumnIndex": 12
+                    }
+                }
+            }
+        }]
+    })
+
+def add_banding(spreadsheet, sheet):
+    sheet_id = sheet._properties['sheetId']
+    spreadsheet.batch_update({
+        "requests": [{
+            "addBanding": {
+                "bandedRange": {
+                    "range": {
+                        "sheetId": sheet_id,
+                        "startRowIndex": 1,
+                        "startColumnIndex": 0,
+                        "endColumnIndex": 12
+                    },
+                    "rowProperties": {
+                        "headerColor": {"red": 0.157, "green": 0.306, "blue": 0.475},
+                        "firstBandColor": {"red": 1, "green": 1, "blue": 1},
+                        "secondBandColor": {"red": 0.949, "green": 0.949, "blue": 0.949}
+                    }
+                }
+            }
+        }]
+    })
+
+def add_statut_validation(spreadsheet, sheet):
+    sheet_id = sheet._properties['sheetId']
+    spreadsheet.batch_update({
+        "requests": [{
+            "setDataValidation": {
+                "range": {
+                    "sheetId": sheet_id,
+                    "startRowIndex": 1,
+                    "startColumnIndex": 9,
+                    "endColumnIndex": 10
+                },
+                "rule": {
+                    "condition": {
+                        "type": "ONE_OF_LIST",
+                        "values": [
+                            {"userEnteredValue": "À postuler"},
+                            {"userEnteredValue": "Postulé"},
+                            {"userEnteredValue": "Entretien"},
+                            {"userEnteredValue": "Refus"},
+                            {"userEnteredValue": "Offre"},
+                            {"userEnteredValue": "Abandonné"}
+                        ]
+                    },
+                    "showCustomUi": True,
+                    "strict": True
+                }
+            }
+        }]
+    })
+
+def init_sheet(spreadsheet, sheet):
     if sheet.row_values(1) == []:
         sheet.append_row([
             "Date", "Titre", "Entreprise", "Score", "Verdict",
@@ -41,18 +110,22 @@ def init_sheet(sheet):
         ))
         set_frozen(sheet, rows=1)
 
-        set_column_width(sheet, "A", 90)   # Date
-        set_column_width(sheet, "B", 220)  # Titre
-        set_column_width(sheet, "C", 150)  # Entreprise
-        set_column_width(sheet, "D", 60)   # Score
-        set_column_width(sheet, "E", 100)  # Verdict
-        set_column_width(sheet, "F", 130)  # Localisation
-        set_column_width(sheet, "G", 100)  # Contrat
-        set_column_width(sheet, "H", 110)  # Télétravail
-        set_column_width(sheet, "I", 60)   # URL
-        set_column_width(sheet, "J", 110)  # Statut
-        set_column_width(sheet, "K", 150)  # Prochaine action
-        set_column_width(sheet, "L", 200)  # Notes
+        set_column_width(sheet, "A", 90)
+        set_column_width(sheet, "B", 220)
+        set_column_width(sheet, "C", 150)
+        set_column_width(sheet, "D", 60)
+        set_column_width(sheet, "E", 100)
+        set_column_width(sheet, "F", 130)
+        set_column_width(sheet, "G", 100)
+        set_column_width(sheet, "H", 110)
+        set_column_width(sheet, "I", 60)
+        set_column_width(sheet, "J", 110)
+        set_column_width(sheet, "K", 150)
+        set_column_width(sheet, "L", 200)
+
+        add_filters(spreadsheet, sheet)
+        add_banding(spreadsheet, sheet)
+        add_statut_validation(spreadsheet, sheet)
 
 def format_job_rows(sheet, start_row: int, rows: list):
     for i, row in enumerate(rows):
@@ -65,8 +138,15 @@ def format_job_rows(sheet, start_row: int, rows: list):
 
 def append_jobs(results: list[tuple]) -> None:
     try:
-        sheet = get_sheet()
-        init_sheet(sheet)
+        credentials_json = os.getenv("GOOGLE_CREDENTIALS")
+        credentials_dict = json.loads(credentials_json)
+        credentials = Credentials.from_service_account_info(credentials_dict, scopes=SCOPES)
+        client = gspread.authorize(credentials)
+        sheet_id = os.getenv("GOOGLE_SHEET_ID")
+        spreadsheet = client.open_by_key(sheet_id)
+        sheet = spreadsheet.sheet1
+
+        init_sheet(spreadsheet, sheet)
 
         date_str = datetime.now().strftime("%d/%m/%Y")
         rows = []
