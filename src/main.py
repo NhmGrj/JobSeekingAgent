@@ -2,6 +2,7 @@ from scraper import scrape_jobs, login
 from evaluator import evaluate_job
 from database import init_db, is_seen, mark_seen
 from reporter import send_telegram
+from sheet_reporter import append_jobs
 from playwright.sync_api import sync_playwright
 from datetime import datetime
 import time
@@ -53,5 +54,6 @@ def main():
 
     print(f"\nRésultats sauvegardés dans {output_path}")
     send_telegram(results)
+    append_jobs(results)
 
 main()
