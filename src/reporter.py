@@ -8,6 +8,9 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 def send_telegram(results: list[tuple]) -> None:
+    print(f"[DEBUG] Token: {TELEGRAM_TOKEN[:10] if TELEGRAM_TOKEN else 'NONE'}...")
+    print(f"[DEBUG] Chat ID: {TELEGRAM_CHAT_ID}")
+
     postuler = [(job, r) for job, r in results if r['verdict'] == "POSTULER"]
     peut_etre = [(job, r) for job, r in results if r['verdict'] == "PEUT-ÊTRE"]
 
