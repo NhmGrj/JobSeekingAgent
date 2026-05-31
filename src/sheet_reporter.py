@@ -2,10 +2,7 @@ import gspread
 import os
 import json
 from google.oauth2.service_account import Credentials
-from gspread_formatting import (
-    format_cell_range, CellFormat, Color, TextFormat,
-    set_frozen, set_column_width
-)
+from gspread_formatting import set_column_width, set_frozen
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -16,165 +13,170 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-COLOR_POSTULER = Color(0.714, 0.843, 0.659)
-COLOR_PEUT_ETRE = Color(1.0, 0.949, 0.667)
-COLOR_HEADER = Color(0.157, 0.306, 0.475)
+HEADERS = [
+    "Date", "Titre", "Entreprise", "Score", "Verdict",
+    "Localisation", "Contrat", "Télétravail", "URL", "Statut", "Prochaine action", "Notes"
+]
 
-def get_sheet():
+def get_credentials():
     credentials_json = os.getenv("GOOGLE_CREDENTIALS")
     credentials_dict = json.loads(credentials_json)
-    credentials = Credentials.from_service_account_info(credentials_dict, scopes=SCOPES)
-    client = gspread.authorize(credentials)
-    sheet_id = os.getenv("GOOGLE_SHEET_ID")
-    return client.open_by_key(sheet_id).sheet1
+    return Credentials.from_service_account_info(credentials_dict, scopes=SCOPES)
 
-def add_filters(spreadsheet, sheet):
-    sheet_id = sheet._properties['sheetId']
+def get_spreadsheet():
+    client = gspread.authorize(get_credentials())
+    sheet_id = os.getenv("GOOGLE_SHEET_ID")
+    return client.open_by_key(sheet_id)
+
+def get_table_id(spreadsheet, sheet_id):
+    data = spreadsheet.fetch_sheet_metadata()
+    for s in data.get("sheets", []):
+        if s["properties"]["sheetId"] == sheet_id:
+            for table in s.get("tables", []):
+                return table["tableId"]
+    return None
+
+def create_table(spreadsheet, sheet, sheet_id, num_rows):
     spreadsheet.batch_update({
         "requests": [{
-            "setBasicFilter": {
-                "filter": {
+            "addTable": {
+                "table": {
+                    "name": "Job Hunt",
                     "range": {
                         "sheetId": sheet_id,
                         "startRowIndex": 0,
+                        "endRowIndex": num_rows + 1,
                         "startColumnIndex": 0,
                         "endColumnIndex": 12
-                    }
+                    },
+                    "columnProperties": [
+                        {"columnIndex": 0, "columnName": "Date", "columnType": "TEXT"},
+                        {"columnIndex": 1, "columnName": "Titre", "columnType": "TEXT"},
+                        {"columnIndex": 2, "columnName": "Entreprise", "columnType": "TEXT"},
+                        {"columnIndex": 3, "columnName": "Score", "columnType": "TEXT"},
+                        {"columnIndex": 4, "columnName": "Verdict", "columnType": "DROPDOWN",
+                         "dataValidationRule": {"condition": {"type": "ONE_OF_LIST", "values": [
+                             {"userEnteredValue": "POSTULER"},
+                             {"userEnteredValue": "PEUT-ÊTRE"},
+                             {"userEnteredValue": "IGNORER"}
+                         ]}}},
+                        {"columnIndex": 5, "columnName": "Localisation", "columnType": "TEXT"},
+                        {"columnIndex": 6, "columnName": "Contrat", "columnType": "TEXT"},
+                        {"columnIndex": 7, "columnName": "Télétravail", "columnType": "TEXT"},
+                        {"columnIndex": 8, "columnName": "URL", "columnType": "TEXT"},
+                        {"columnIndex": 9, "columnName": "Statut", "columnType": "DROPDOWN",
+                         "dataValidationRule": {"condition": {"type": "ONE_OF_LIST", "values": [
+                             {"userEnteredValue": "À postuler"},
+                             {"userEnteredValue": "Postulé"},
+                             {"userEnteredValue": "Entretien"},
+                             {"userEnteredValue": "Refus"},
+                             {"userEnteredValue": "Offre"},
+                             {"userEnteredValue": "Abandonné"}
+                         ]}}},
+                        {"columnIndex": 10, "columnName": "Prochaine action", "columnType": "TEXT"},
+                        {"columnIndex": 11, "columnName": "Notes", "columnType": "TEXT"}
+                    ]
                 }
             }
         }]
     })
 
-def add_banding(spreadsheet, sheet):
-    sheet_id = sheet._properties['sheetId']
+    set_column_width(sheet, "A", 90)
+    set_column_width(sheet, "B", 220)
+    set_column_width(sheet, "C", 150)
+    set_column_width(sheet, "D", 60)
+    set_column_width(sheet, "E", 110)
+    set_column_width(sheet, "F", 130)
+    set_column_width(sheet, "G", 100)
+    set_column_width(sheet, "H", 130)
+    set_column_width(sheet, "I", 90)
+    set_column_width(sheet, "J", 120)
+    set_column_width(sheet, "K", 150)
+    set_column_width(sheet, "L", 200)
+
+def extend_table(spreadsheet, sheet_id, table_id, current_end_row, num_new_rows):
     spreadsheet.batch_update({
         "requests": [{
-            "addBanding": {
-                "bandedRange": {
+            "updateTable": {
+                "table": {
+                    "tableId": str(table_id),
                     "range": {
                         "sheetId": sheet_id,
-                        "startRowIndex": 1,
+                        "startRowIndex": 0,
+                        "endRowIndex": current_end_row + num_new_rows,
                         "startColumnIndex": 0,
                         "endColumnIndex": 12
-                    },
-                    "rowProperties": {
-                        "headerColor": {"red": 0.157, "green": 0.306, "blue": 0.475},
-                        "firstBandColor": {"red": 1, "green": 1, "blue": 1},
-                        "secondBandColor": {"red": 0.949, "green": 0.949, "blue": 0.949}
                     }
-                }
+                },
+                "fields": "range"
             }
         }]
     })
 
-def add_statut_validation(spreadsheet, sheet):
-    sheet_id = sheet._properties['sheetId']
+def append_to_table(spreadsheet, sheet_id, table_id, rows):
+    cell_data = []
+    for row in rows:
+        row_data = []
+        for cell in row:
+            if isinstance(cell, str) and cell.startswith("="):
+                row_data.append({"userEnteredValue": {"formulaValue": cell}})
+            elif isinstance(cell, (int, float)):
+                row_data.append({"userEnteredValue": {"numberValue": cell}})
+            else:
+                row_data.append({"userEnteredValue": {"stringValue": str(cell)}})
+        cell_data.append({"values": row_data})
+
     spreadsheet.batch_update({
         "requests": [{
-            "setDataValidation": {
-                "range": {
-                    "sheetId": sheet_id,
-                    "startRowIndex": 1,
-                    "startColumnIndex": 9,
-                    "endColumnIndex": 10
-                },
-                "rule": {
-                    "condition": {
-                        "type": "ONE_OF_LIST",
-                        "values": [
-                            {"userEnteredValue": "À postuler"},
-                            {"userEnteredValue": "Postulé"},
-                            {"userEnteredValue": "Entretien"},
-                            {"userEnteredValue": "Refus"},
-                            {"userEnteredValue": "Offre"},
-                            {"userEnteredValue": "Abandonné"}
-                        ]
-                    },
-                    "showCustomUi": True,
-                    "strict": True
-                }
+            "appendCells": {
+                "tableId": str(table_id),
+                "rows": cell_data,
+                "fields": "userEnteredValue"
             }
         }]
     })
-
-def init_sheet(spreadsheet, sheet):
-    if sheet.row_values(1) == []:
-        sheet.append_row([
-            "Date", "Titre", "Entreprise", "Score", "Verdict",
-            "Localisation", "Contrat", "Télétravail", "URL", "Statut", "Prochaine action", "Notes"
-        ], value_input_option="RAW")
-
-        format_cell_range(sheet, "1:1", CellFormat(
-            backgroundColor=COLOR_HEADER,
-            textFormat=TextFormat(bold=True, foregroundColor=Color(1, 1, 1)),
-        ))
-        set_frozen(sheet, rows=1)
-
-        set_column_width(sheet, "A", 90)
-        set_column_width(sheet, "B", 220)
-        set_column_width(sheet, "C", 150)
-        set_column_width(sheet, "D", 60)
-        set_column_width(sheet, "E", 100)
-        set_column_width(sheet, "F", 130)
-        set_column_width(sheet, "G", 100)
-        set_column_width(sheet, "H", 110)
-        set_column_width(sheet, "I", 60)
-        set_column_width(sheet, "J", 110)
-        set_column_width(sheet, "K", 150)
-        set_column_width(sheet, "L", 200)
-
-        add_filters(spreadsheet, sheet)
-        add_banding(spreadsheet, sheet)
-        add_statut_validation(spreadsheet, sheet)
-
-def format_job_rows(sheet, start_row: int, rows: list):
-    for i, row in enumerate(rows):
-        verdict = row[4]
-        color = COLOR_POSTULER if verdict == "POSTULER" else COLOR_PEUT_ETRE
-        row_num = start_row + i
-        format_cell_range(sheet, f"{row_num}:{row_num}", CellFormat(
-            backgroundColor=color
-        ))
 
 def append_jobs(results: list[tuple]) -> None:
     try:
-        credentials_json = os.getenv("GOOGLE_CREDENTIALS")
-        credentials_dict = json.loads(credentials_json)
-        credentials = Credentials.from_service_account_info(credentials_dict, scopes=SCOPES)
-        client = gspread.authorize(credentials)
-        sheet_id = os.getenv("GOOGLE_SHEET_ID")
-        spreadsheet = client.open_by_key(sheet_id)
+        spreadsheet = get_spreadsheet()
         sheet = spreadsheet.sheet1
-
-        init_sheet(spreadsheet, sheet)
+        sheet_id = sheet._properties["sheetId"]
 
         date_str = datetime.now().strftime("%d/%m/%Y")
         rows = []
 
         for job, result in results:
-            if result['verdict'] in ["POSTULER", "PEUT-ÊTRE"]:
+            if result["verdict"] in ["POSTULER", "PEUT-ÊTRE"]:
                 rows.append([
                     date_str,
-                    job['title'],
-                    job['company'],
-                    result['score'],
-                    result['verdict'],
-                    job['location'],
-                    job['contract'],
-                    job['remote'],
+                    job["title"],
+                    job["company"],
+                    result["score"],
+                    result["verdict"],
+                    job["location"],
+                    job["contract"],
+                    job["remote"],
                     f'=HYPERLINK("{job["url"]}","Voir offre")',
-                    "À postuler" if result['verdict'] == "POSTULER" else "À évaluer",
+                    "À postuler" if result["verdict"] == "POSTULER" else "À évaluer",
                     "",
                     ""
                 ])
 
-        if rows:
-            start_row = len(sheet.get_all_values()) + 1
-            sheet.append_rows(rows, value_input_option="USER_ENTERED")
-            format_job_rows(sheet, start_row, rows)
-            print(f"Google Sheet updated with {len(rows)} new jobs.")
-        else:
+        if not rows:
             print("No jobs to add to Google Sheet.")
+            return
+
+        table_id = get_table_id(spreadsheet, sheet_id)
+
+        if table_id is None:
+            sheet.append_rows(rows, value_input_option="USER_ENTERED")
+            create_table(spreadsheet, sheet, sheet_id, len(rows))
+            print(f"Google Sheet table created with {len(rows)} jobs.")
+        else:
+            current_row_count = len(sheet.get_all_values())
+            extend_table(spreadsheet, sheet_id, table_id, current_row_count, len(rows))
+            append_to_table(spreadsheet, sheet_id, table_id, rows)
+            print(f"Google Sheet table extended with {len(rows)} new jobs.")
 
     except Exception as e:
         print(f"Google Sheet error: {e}")
