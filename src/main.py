@@ -1,58 +1,79 @@
-from scraper import scrape_jobs, login
-from evaluator import evaluate_job
-from database import init_db, is_seen, mark_seen
-from reporter import send_telegram
-from notion_reporter import append_jobs
-from playwright.sync_api import sync_playwright
-from datetime import datetime
+from dotenv import load_dotenv
+load_dotenv()
+
+import os
 import time
 
+from playwright.sync_api import sync_playwright
+
+import config
+from core import database, evaluator, reporter_telegram, results_writer
+
+
+def run_source(page, user: config.UserConfig, source: config.SourceConfig) -> list[dict]:
+    creds = {field: os.environ[env_name] for field, env_name in source.credentials_env.items()}
+    source.source_def.login(page, creds)
+    items = source.source_def.scrape(page, source.search_url, source.max_pages)
+
+    new_items = [
+        item for item in items
+        if not database.is_seen(user.id, source.id, source.source_def.item_key(item))
+    ]
+    print(f"[{user.id}/{source.id}] {len(items)} trouvés, {len(new_items)} nouveaux à évaluer")
+
+    evaluated = []
+    for i, item in enumerate(new_items):
+        result = evaluator.evaluate_item(item, source.criteria)
+        key = source.source_def.item_key(item)
+        summary = source.source_def.format_summary(item)
+        database.mark_seen(user.id, source.id, key, item.get("url", ""), summary)
+        evaluated.append({
+            "subject": source.subject,
+            "summary": summary,
+            "url": item.get("url", ""),
+            **result,
+        })
+        print(f"{result['verdict']} ({result['score']}/10) — {summary}")
+        if i < len(new_items) - 1:
+            time.sleep(3)
+
+    return evaluated
+
+
+def run_user(browser, user: config.UserConfig) -> None:
+    all_evaluated = []
+    for source in user.sources:
+        context = browser.new_context()
+        try:
+            all_evaluated.extend(run_source(context.new_page(), user, source))
+        except Exception as e:
+            print(f"[{user.id}/{source.id}] ERROR: {e}")
+        finally:
+            context.close()
+
+    bot_token = os.environ[user.telegram_token_env]
+    chat_id = os.environ[user.telegram_chat_id_env]
+    reporter_telegram.send_report(bot_token, chat_id, all_evaluated)
+
+    path = results_writer.write_markdown(user.id, all_evaluated)
+    print(f"[{user.id}] Résultats sauvegardés dans {path}")
+
+
 def main():
-    init_db()
+    config.validate_config(config.USERS)
+    database.init_db()
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
+        try:
+            for user in config.USERS:
+                try:
+                    run_user(browser, user)
+                except Exception as e:
+                    print(f"[{user.id}] ERROR: {e}")
+        finally:
+            browser.close()
 
-        login(page)
-        jobs = scrape_jobs(page, "https://www.welcometothejungle.com/fr/jobs-matches")
-        browser.close()
 
-    new_jobs = [job for job in jobs if job['title'] != "N/A" and not is_seen(job['title'], job['company'])]
-
-    print(f"\n{len(jobs) - 1} offres trouvées, {len(new_jobs)} nouvelles à évaluer\n")
-
-    if not new_jobs:
-        print("Aucune nouvelle offre aujourd'hui !")
-        send_telegram([])
-        return
-
-    results = []
-    for i, job in enumerate(new_jobs):
-        result = evaluate_job(job)
-        mark_seen(job['url'], job['title'], job['company'])
-        results.append((job, result))
-        print(f"{result['verdict']} ({result['score']}/10) — {job['title']} @ {job['company']}")
-        if i < len(new_jobs) - 1:
-            time.sleep(3)
-
-    date_str = datetime.now().strftime("%Y-%m-%d_%H-%M")
-    output_path = f"../results_{date_str}.md"
-
-    with open(output_path, "w") as f:
-        f.write(f"# Résultats du {datetime.now().strftime('%d/%m/%Y %H:%M')}\n\n")
-        for verdict in ["POSTULER", "PEUT-ÊTRE", "IGNORER"]:
-            f.write(f"## {verdict}\n\n")
-            for job, result in results:
-                if result['verdict'] == verdict:
-                    f.write(f"### {job['title']} @ {job['company']}\n")
-                    f.write(f"- **Score:** {result['score']}/10\n")
-                    f.write(f"- **Localisation:** {job['location']} | {job['contract']} | {job['remote']}\n")
-                    f.write(f"- **Analyse:** {result['explanation']}\n")
-                    f.write(f"- **URL:** {job['url']}\n\n")
-
-    print(f"\nRésultats sauvegardés dans {output_path}")
-    send_telegram(results)
-    append_jobs(results)
-
-main()
+if __name__ == "__main__":
+    main()

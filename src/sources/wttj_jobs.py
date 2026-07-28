@@ -1,10 +1,31 @@
-from playwright.sync_api import sync_playwright
-from dotenv import load_dotenv
-import os
+from sources.base import SourceDef
 
-load_dotenv()
+DEFAULT_CRITERIA = """
+Tu es un assistant spécialisé dans la recherche d'emploi. Tu dois évaluer des offres d'emploi pour un candidat avec le profil suivant :
 
-def login(page):
+- 4 ans d'expérience en Product Management
+- Recherche un poste de Product Manager (PM fortement préféré, Product Owner acceptable)
+- Localisation : Paris uniquement, ou télétravail total
+- Contrat : CDI uniquement
+- Salaire minimum : 50 000€ brut annuel
+- Expérience principale en B2B, intéressé par le B2C
+- Télétravail fréquent ou total fortement préféré, occasionnel acceptable, pas de télétravail = malus mais pas éliminatoire
+
+Pour chaque offre, tu dois retourner :
+1. Un score de 1 à 10
+2. Une courte explication (2-3 phrases max) des points positifs et négatifs
+3. Un verdict : POSTULER, PEUT-ÊTRE, ou IGNORER
+
+Réponds uniquement en JSON avec ce format :
+{
+  "score": 8,
+  "explanation": "...",
+  "verdict": "POSTULER"
+}
+"""
+
+
+def login(page, creds: dict) -> None:
     print("Opening WTTJ...")
     page.goto("https://www.welcometothejungle.com/fr/authenticate/signin", timeout=30000)
     page.wait_for_load_state("domcontentloaded")
@@ -20,9 +41,9 @@ def login(page):
 
     print("Filling login form...")
     page.wait_for_selector('[data-testid="sign-in-form-email-input"]')
-    page.fill('[data-testid="sign-in-form-email-input"]', os.getenv("WTTJ_EMAIL"))
+    page.fill('[data-testid="sign-in-form-email-input"]', creds["email"])
     page.wait_for_timeout(500)
-    page.fill('[data-testid="sign-in-form-password-input"]', os.getenv("WTTJ_PASSWORD"))
+    page.fill('[data-testid="sign-in-form-password-input"]', creds["password"])
     page.wait_for_timeout(500)
     page.click('[data-testid="sign-in-form-submit-button"]')
 
@@ -30,7 +51,8 @@ def login(page):
     page.wait_for_timeout(3000)
     print("Logged in — current URL:", page.url)
 
-def scrape_jobs(page, search_url: str, max_pages: int = 5) -> list[dict]:
+
+def scrape(page, search_url: str, max_pages: int = 5) -> list[dict]:
     print("Navigating to job search...")
     page.goto(search_url, timeout=30000)
     page.wait_for_load_state("domcontentloaded")
@@ -45,18 +67,21 @@ def scrape_jobs(page, search_url: str, max_pages: int = 5) -> list[dict]:
 
         for card in cards:
             title_el = card.query_selector("a[href*='/jobs/']")
+            if not title_el:
+                continue
+
             company_el = card.query_selector("p")
             location_el = card.query_selector('[data-testid="job-card-tag-location"] span')
             contract_el = card.query_selector('[data-testid="job-card-tag-contract-type"] span')
             remote_el = card.query_selector('[data-testid="job-card-tag-remote"] span')
 
             jobs.append({
-                "title": title_el.inner_text() if title_el else "N/A",
+                "title": title_el.inner_text(),
                 "company": company_el.inner_text() if company_el else "N/A",
                 "location": location_el.inner_text() if location_el else "N/A",
                 "contract": contract_el.inner_text() if contract_el else "N/A",
                 "remote": remote_el.inner_text() if remote_el else "N/A",
-                "url": "https://www.welcometothejungle.com" + title_el.get_attribute("href") if title_el else "N/A",
+                "url": "https://www.welcometothejungle.com" + title_el.get_attribute("href"),
             })
 
         try:
@@ -73,3 +98,22 @@ def scrape_jobs(page, search_url: str, max_pages: int = 5) -> list[dict]:
 
     print(f"Total jobs scraped: {len(jobs)}")
     return jobs
+
+
+def item_key(item: dict) -> str:
+    return f"{item['title']}|{item['company']}".lower().strip()
+
+
+def format_summary(item: dict) -> str:
+    return f"{item['title']} @ {item['company']} — {item['location']} | {item['contract']} | {item['remote']}"
+
+
+SOURCE = SourceDef(
+    platform="wttj",
+    subject="jobs",
+    login=login,
+    scrape=scrape,
+    item_key=item_key,
+    format_summary=format_summary,
+    default_criteria=DEFAULT_CRITERIA,
+)
