@@ -22,3 +22,7 @@ Suppression de fichiers qui traînaient à la racine, sans rapport avec le code 
 
 ### Point relevé (non traité)
 `.github/workflows/daily_job_hunt.yml` référence encore `GOOGLE_CREDENTIALS` et `GOOGLE_SHEET_ID` dans les `env:` du job, alors que le code ne les utilise plus. À nettoyer si confirmé obsolète.
+
+## 2026-07-28 — Suppression des secrets Google Sheets du workflow CI
+
+Confirmé : plus aucune référence à `GOOGLE_CREDENTIALS`/`GOOGLE_SHEET_ID`/`gspread` dans le code Python (`grep` sur `*.py`). Retrait des deux lignes correspondantes dans `.github/workflows/daily_job_hunt.yml` (`env:` de l'étape "Run job hunter"). Les secrets GitHub `GOOGLE_CREDENTIALS`/`GOOGLE_SHEET_ID` eux-mêmes restent configurés côté repo GitHub — à supprimer manuellement dans Settings → Secrets si tu veux finir le ménage (je n'ai pas accès à ça depuis ici).
