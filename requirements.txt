@@ -3,6 +3,3 @@ playwright
 python-dotenv
 requests
 python-telegram-bot
-gspread
-google-auth
-gspread-formatting
