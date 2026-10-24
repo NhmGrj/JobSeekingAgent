@@ -74,3 +74,11 @@ Le CDN (CloudFront) de WTTJ renvoie maintenant 403 « The request could not be s
 - `src/main.py` : `browser.new_context(user_agent=USER_AGENT)` avec un UA Chrome desktop.
 - `src/main.py` : `main()` renvoie 1 si une source ou un utilisateur a échoué, pour que le run CI passe en rouge.
 - Workflow : `set -o pipefail` pour que `| tee` ne masque plus l'échec. Les étapes commit DB / upload restent en `if: always()`.
+
+## 2026-10-24 — Mistral inutilisable, sauvegarde des offres non évaluées
+
+Le run manuel après le correctif du login a bien scrapé (51 offres, 8 nouvelles uniques), mais Mistral a renvoyé `429 Rate limit exceeded` (code 1300) sur toutes les évaluations, même après les retries. Décision : on abandonne Mistral, migration vers l'API Claude à discuter.
+
+Problème : `main.py` marquait l'offre comme vue même quand l'évaluation échouait (`ERREUR`), donc ces offres n'auraient jamais été réévaluées.
+- `src/main.py` : `mark_seen` uniquement si le verdict n'est pas `ERREUR` ; une offre en échec sera retentée au run suivant.
+- `seen_jobs.db` : suppression des 8 lignes du run du 2026-10-24 21:30 UTC (Kanbios x2, Linxea, Safran.AI, Health Data Hub, Pelico, Manutan, Dedale) pour qu'elles soient réévaluées.

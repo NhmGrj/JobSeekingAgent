@@ -32,7 +32,9 @@ def run_source(page, user: config.UserConfig, source: config.SourceConfig) -> li
         result = evaluator.evaluate_item(item, source.criteria)
         key = source.source_def.item_key(item)
         summary = source.source_def.format_summary(item)
-        database.mark_seen(user.id, source.id, key, item.get("url", ""), summary)
+        # Failed evaluations stay unseen so the next run retries them.
+        if result["verdict"] != "ERREUR":
+            database.mark_seen(user.id, source.id, key, item.get("url", ""), summary)
         evaluated.append({
             "subject": source.subject,
             "summary": summary,
