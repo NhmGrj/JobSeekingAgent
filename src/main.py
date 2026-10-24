@@ -43,7 +43,7 @@ def run_source(page, user: config.UserConfig, source: config.SourceConfig) -> li
         })
         print(f"{result['verdict']} ({result['score']}/10) — {summary}")
         if i < len(new_items) - 1:
-            time.sleep(3)
+            time.sleep(7)  # stay under the Gemini free tier per-minute limit
 
     return evaluated
 

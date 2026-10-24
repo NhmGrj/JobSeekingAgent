@@ -82,3 +82,14 @@ Le run manuel après le correctif du login a bien scrapé (51 offres, 8 nouvelle
 Problème : `main.py` marquait l'offre comme vue même quand l'évaluation échouait (`ERREUR`), donc ces offres n'auraient jamais été réévaluées.
 - `src/main.py` : `mark_seen` uniquement si le verdict n'est pas `ERREUR` ; une offre en échec sera retentée au run suivant.
 - `seen_jobs.db` : suppression des 8 lignes du run du 2026-10-24 21:30 UTC (Kanbios x2, Linxea, Safran.AI, Health Data Hub, Pelico, Manutan, Dedale) pour qu'elles soient réévaluées.
+
+## 2026-10-24 — Remplacement de Mistral par Gemini (free tier)
+
+Contrainte : rester gratuit. L'API Claude est payante uniquement ; GitHub Models semble retiré (juillet 2026). Choix : Google Gemini, free tier (~10 req/min, ~1 500 req/jour sur les modèles Flash, large pour ~10 offres/jour). Attention : sur le free tier, Google peut utiliser les contenus envoyés pour améliorer ses produits (ici : offres publiques + critères de profil).
+
+- `src/core/evaluator.py` : SDK `google-genai`, modèle `gemini-3.8-flash`, `generate_content` avec `system_instruction` = critères et sortie JSON contrainte par schéma (`response_json_schema`), ce qui supprime les erreurs de parsing. Retry sur 429 conservé (via `errors.APIError.code`).
+- `src/main.py` : pause de 7 s entre deux évaluations (au lieu de 3 s) pour rester sous la limite par minute.
+- `requirements.txt` : `mistralai` → `google-genai`.
+- Workflow + `.env.example` : `MISTRAL_API_KEY` → `GEMINI_API_KEY`.
+
+Testé localement avec une fausse clé : la requête atteint l'API Google et échoue uniquement sur la clé. Reste à créer la clé sur aistudio.google.com et l'ajouter en secret GitHub `GEMINI_API_KEY`.

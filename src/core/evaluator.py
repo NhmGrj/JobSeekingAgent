@@ -1,15 +1,28 @@
-from mistralai.client import Mistral
+from google import genai
+from google.genai import errors, types
 import os
 import json
 import time
 
+MODEL = "gemini-3.8-flash"
+
+RESPONSE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "score": {"type": "integer", "minimum": 1, "maximum": 10},
+        "explanation": {"type": "string"},
+        "verdict": {"type": "string", "enum": ["POSTULER", "PEUT-ÊTRE", "IGNORER"]},
+    },
+    "required": ["score", "explanation", "verdict"],
+}
+
 _client = None
 
 
-def _get_client() -> Mistral:
+def _get_client() -> genai.Client:
     global _client
     if _client is None:
-        _client = Mistral(api_key=os.getenv("MISTRAL_API_KEY"))
+        _client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
     return _client
 
 
@@ -24,25 +37,29 @@ Voici un élément à évaluer :
 
     for attempt in range(retries):
         try:
-            response = _get_client().chat.complete(
-                model="mistral-small-latest",
-                messages=[
-                    {"role": "system", "content": criteria},
-                    {"role": "user", "content": prompt}
-                ]
+            response = _get_client().models.generate_content(
+                model=MODEL,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=criteria,
+                    response_mime_type="application/json",
+                    response_json_schema=RESPONSE_SCHEMA,
+                ),
             )
-            raw = response.choices[0].message.content
+            raw = response.text
             try:
-                clean = raw.replace("```json", "").replace("```", "").strip()
-                return json.loads(clean)
-            except:
-                return {"score": 0, "explanation": raw, "verdict": "ERREUR"}
+                return json.loads(raw)
+            except (json.JSONDecodeError, TypeError):
+                return {"score": 0, "explanation": str(raw), "verdict": "ERREUR"}
 
-        except Exception as e:
-            if "429" in str(e) and attempt < retries - 1:
+        except errors.APIError as e:
+            if e.code == 429 and attempt < retries - 1:
                 wait = delay * (attempt + 1)
                 print(f"Rate limit hit, waiting {wait}s before retry ({attempt + 1}/{retries})...")
                 time.sleep(wait)
             else:
-                print(f"Mistral error: {e}")
+                print(f"Gemini error: {e}")
                 return {"score": 0, "explanation": str(e), "verdict": "ERREUR"}
+        except Exception as e:
+            print(f"Gemini error: {e}")
+            return {"score": 0, "explanation": str(e), "verdict": "ERREUR"}

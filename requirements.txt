@@ -1,4 +1,4 @@
-mistralai
+google-genai
 playwright
 python-dotenv
 requests
