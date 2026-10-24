@@ -61,3 +61,16 @@ L'ancienne clé (`title|company` seul) aurait fait collision entre deux sources/
 
 ### CI / secrets
 Retrait de `NOTION_TOKEN`/`NOTION_DATABASE_ID` du `env:` du workflow (plus rien ne les lit) et de `.env.example`. Les identifiants WTTJ/Telegram existants n'ont pas été renommés — aucune modification à faire côté secrets GitHub pour que la CI continue de fonctionner à l'identique. Un futur 2e utilisateur/source suit une convention `<USER>_<PLATEFORME>_<CHAMP>` (documentée en commentaire dans `.env.example` et `config.py`).
+
+## 2026-10-24 — Login WTTJ cassé depuis le 2026-10-02 (user agent headless bloqué)
+
+### Symptôme
+Depuis le run du 2026-10-02, chaque exécution échoue au login : `Page.wait_for_selector: Timeout 30000ms exceeded` sur `[data-testid="sign-in-form-email-input"]`. Aucune offre scrapée depuis. Le workflow restait pourtant vert : l'exception est attrapée dans `main.py` et le `| tee` masquait de toute façon le code de sortie.
+
+### Cause
+Le CDN (CloudFront) de WTTJ renvoie maintenant 403 « The request could not be satisfied » au user agent par défaut de Chromium headless (`HeadlessChrome`). Avec un UA Chrome classique, la page se charge normalement. Les sélecteurs du formulaire de login sont inchangés (vérifié avec Playwright).
+
+### Correctifs
+- `src/main.py` : `browser.new_context(user_agent=USER_AGENT)` avec un UA Chrome desktop.
+- `src/main.py` : `main()` renvoie 1 si une source ou un utilisateur a échoué, pour que le run CI passe en rouge.
+- Workflow : `set -o pipefail` pour que `| tee` ne masque plus l'échec. Les étapes commit DB / upload restent en `if: always()`.

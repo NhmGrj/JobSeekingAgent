@@ -9,6 +9,12 @@ from playwright.sync_api import sync_playwright
 import config
 from core import database, evaluator, reporter_telegram, results_writer
 
+# WTTJ's CDN returns 403 to the default "HeadlessChrome" user agent (since 2026-10-02).
+USER_AGENT = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
+)
+
 
 def run_source(page, user: config.UserConfig, source: config.SourceConfig) -> list[dict]:
     creds = {field: os.environ[env_name] for field, env_name in source.credentials_env.items()}
@@ -40,14 +46,16 @@ def run_source(page, user: config.UserConfig, source: config.SourceConfig) -> li
     return evaluated
 
 
-def run_user(browser, user: config.UserConfig) -> None:
+def run_user(browser, user: config.UserConfig) -> bool:
+    ok = True
     all_evaluated = []
     for source in user.sources:
-        context = browser.new_context()
+        context = browser.new_context(user_agent=USER_AGENT)
         try:
             all_evaluated.extend(run_source(context.new_page(), user, source))
         except Exception as e:
             print(f"[{user.id}/{source.id}] ERROR: {e}")
+            ok = False
         finally:
             context.close()
 
@@ -57,23 +65,29 @@ def run_user(browser, user: config.UserConfig) -> None:
 
     path = results_writer.write_markdown(user.id, all_evaluated)
     print(f"[{user.id}] Résultats sauvegardés dans {path}")
+    return ok
 
 
-def main():
+def main() -> int:
     config.validate_config(config.USERS)
     database.init_db()
 
+    ok = True
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         try:
             for user in config.USERS:
                 try:
-                    run_user(browser, user)
+                    ok = run_user(browser, user) and ok
                 except Exception as e:
                     print(f"[{user.id}] ERROR: {e}")
+                    ok = False
         finally:
             browser.close()
 
+    # Non-zero exit so the CI run shows as failed instead of silently green.
+    return 0 if ok else 1
+
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
