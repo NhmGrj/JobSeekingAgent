@@ -21,6 +21,17 @@ def send_message(bot_token: str, chat_id: str, text: str) -> None:
         print(f"Telegram error: {response.text}")
 
 
+def send_error(bot_token: str, chat_id: str, source_id: str, error: Exception) -> None:
+    # Telegram caps messages at 4096 characters.
+    message = html.escape(str(error)[:3500])
+    send_message(
+        bot_token, chat_id,
+        f"⚠️ <b>Erreur — {html.escape(source_id)}</b>\n"
+        f"<code>{html.escape(type(error).__name__)}</code>\n\n"
+        f"<pre>{message}</pre>",
+    )
+
+
 def send_report(bot_token: str, chat_id: str, evaluated: list[dict]) -> None:
     """evaluated items: {subject, summary, url, score, verdict, explanation}"""
     postuler = [e for e in evaluated if e["verdict"] == "POSTULER"]

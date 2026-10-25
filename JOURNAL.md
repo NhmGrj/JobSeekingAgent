@@ -99,3 +99,16 @@ Testé localement avec une fausse clé : la requête atteint l'API Google et éc
 Run manuel `40146055046` : Gemini fonctionne (8/13 offres évaluées, dont 4 POSTULER). Deux problèmes :
 - 5 offres en `503 UNAVAILABLE` (« high demand », surcharge temporaire côté Google). Seul le 429 était retenté. `src/core/evaluator.py` : retry aussi sur 503. Les 5 offres sont restées non vues et seront réévaluées au prochain run.
 - 1 message Telegram rejeté (`can't parse entities`) : le mode `Markdown` legacy casse dès qu'une explication contient `_`, `*`, etc. `src/core/reporter_telegram.py` : passage en `parse_mode: HTML` avec `html.escape` sur le résumé, l'URL et l'explication.
+
+## 2026-10-25 — Évaluation en une seule requête + erreurs envoyées sur Telegram
+
+Constat du run `40147132291` : le free tier de `gemini-3.8-flash` est limité à **20 requêtes/jour** (message d'erreur Google, quota `GenerateRequestsPerDayPerProjectPerModel-FreeTier`), pas ~1 500 comme annoncé par des guides tiers. Avec une requête par offre + les retries, le quota a été épuisé en deux runs. Le correctif Telegram HTML a bien fonctionné.
+
+Décision (avec l'utilisateur) :
+- `src/core/evaluator.py` : `evaluate_items()` évalue toutes les nouvelles offres d'une source en **une seule requête** (offres numérotées, réponse JSON = liste contrainte par schéma, réordonnée par `index`). Plus de retry ni de pause : toute erreur (API, JSON, offre manquante dans la réponse) est levée telle quelle.
+- `src/core/reporter_telegram.py` : `send_error()` envoie sur Telegram le nom de la source, le type d'exception et son message (échappé HTML, tronqué à 3 500 caractères).
+- `src/main.py` : toute erreur d'une source (login, scraping ou évaluation) est envoyée sur Telegram, le run passe en échec, et rien n'est marqué vu (réévaluation au run suivant). Pas de message « Rien de nouveau » si la seule nouvelle est une erreur.
+
+Choix volontaire : pas de retry ni de fallback vers un autre modèle pour l'instant. On voit les erreurs arriver sur Telegram, puis on décide.
+
+Testé en local : réponse simulée (ordre mélangé), réponse incomplète, et vraie erreur API (fausse clé). Pas encore de vrai run, quota du jour épuisé.

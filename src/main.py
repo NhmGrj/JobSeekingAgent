@@ -2,7 +2,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import os
-import time
 
 from playwright.sync_api import sync_playwright
 
@@ -27,14 +26,15 @@ def run_source(page, user: config.UserConfig, source: config.SourceConfig) -> li
     ]
     print(f"[{user.id}/{source.id}] {len(items)} trouvés, {len(new_items)} nouveaux à évaluer")
 
+    # One request for the whole batch; if it raises, nothing is marked seen and
+    # every item is retried on the next run.
+    results = evaluator.evaluate_items(new_items, source.criteria)
+
     evaluated = []
-    for i, item in enumerate(new_items):
-        result = evaluator.evaluate_item(item, source.criteria)
+    for item, result in zip(new_items, results):
         key = source.source_def.item_key(item)
         summary = source.source_def.format_summary(item)
-        # Failed evaluations stay unseen so the next run retries them.
-        if result["verdict"] != "ERREUR":
-            database.mark_seen(user.id, source.id, key, item.get("url", ""), summary)
+        database.mark_seen(user.id, source.id, key, item.get("url", ""), summary)
         evaluated.append({
             "subject": source.subject,
             "summary": summary,
@@ -42,13 +42,14 @@ def run_source(page, user: config.UserConfig, source: config.SourceConfig) -> li
             **result,
         })
         print(f"{result['verdict']} ({result['score']}/10) — {summary}")
-        if i < len(new_items) - 1:
-            time.sleep(7)  # stay under the Gemini free tier per-minute limit
 
     return evaluated
 
 
 def run_user(browser, user: config.UserConfig) -> bool:
+    bot_token = os.environ[user.telegram_token_env]
+    chat_id = os.environ[user.telegram_chat_id_env]
+
     ok = True
     all_evaluated = []
     for source in user.sources:
@@ -57,13 +58,14 @@ def run_user(browser, user: config.UserConfig) -> bool:
             all_evaluated.extend(run_source(context.new_page(), user, source))
         except Exception as e:
             print(f"[{user.id}/{source.id}] ERROR: {e}")
+            reporter_telegram.send_error(bot_token, chat_id, source.id, e)
             ok = False
         finally:
             context.close()
 
-    bot_token = os.environ[user.telegram_token_env]
-    chat_id = os.environ[user.telegram_chat_id_env]
-    reporter_telegram.send_report(bot_token, chat_id, all_evaluated)
+    # Skip "nothing new today" when the only news is an error already reported.
+    if ok or all_evaluated:
+        reporter_telegram.send_report(bot_token, chat_id, all_evaluated)
 
     path = results_writer.write_markdown(user.id, all_evaluated)
     print(f"[{user.id}] Résultats sauvegardés dans {path}")
