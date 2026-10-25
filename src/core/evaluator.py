@@ -53,9 +53,9 @@ Voici un élément à évaluer :
                 return {"score": 0, "explanation": str(raw), "verdict": "ERREUR"}
 
         except errors.APIError as e:
-            if e.code == 429 and attempt < retries - 1:
+            if e.code in (429, 503) and attempt < retries - 1:
                 wait = delay * (attempt + 1)
-                print(f"Rate limit hit, waiting {wait}s before retry ({attempt + 1}/{retries})...")
+                print(f"Gemini {e.code}, waiting {wait}s before retry ({attempt + 1}/{retries})...")
                 time.sleep(wait)
             else:
                 print(f"Gemini error: {e}")

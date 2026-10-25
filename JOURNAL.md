@@ -93,3 +93,9 @@ Contrainte : rester gratuit. L'API Claude est payante uniquement ; GitHub Models
 - Workflow + `.env.example` : `MISTRAL_API_KEY` → `GEMINI_API_KEY`.
 
 Testé localement avec une fausse clé : la requête atteint l'API Google et échoue uniquement sur la clé. Reste à créer la clé sur aistudio.google.com et l'ajouter en secret GitHub `GEMINI_API_KEY`.
+
+## 2026-10-25 — Premier run Gemini : 503 et message Telegram rejeté
+
+Run manuel `40146055046` : Gemini fonctionne (8/13 offres évaluées, dont 4 POSTULER). Deux problèmes :
+- 5 offres en `503 UNAVAILABLE` (« high demand », surcharge temporaire côté Google). Seul le 429 était retenté. `src/core/evaluator.py` : retry aussi sur 503. Les 5 offres sont restées non vues et seront réévaluées au prochain run.
+- 1 message Telegram rejeté (`can't parse entities`) : le mode `Markdown` legacy casse dès qu'une explication contient `_`, `*`, etc. `src/core/reporter_telegram.py` : passage en `parse_mode: HTML` avec `html.escape` sur le résumé, l'URL et l'explication.

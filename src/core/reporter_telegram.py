@@ -1,3 +1,5 @@
+import html
+
 import requests
 
 SUBJECT_LABELS = {
@@ -11,7 +13,7 @@ def send_message(bot_token: str, chat_id: str, text: str) -> None:
     payload = {
         "chat_id": chat_id,
         "text": text,
-        "parse_mode": "Markdown",
+        "parse_mode": "HTML",
         "disable_web_page_preview": True
     }
     response = requests.post(url, json=payload)
@@ -25,30 +27,30 @@ def send_report(bot_token: str, chat_id: str, evaluated: list[dict]) -> None:
     peut_etre = [e for e in evaluated if e["verdict"] == "PEUT-ÊTRE"]
 
     if not postuler and not peut_etre:
-        send_message(bot_token, chat_id, "🤖 *Rapport du jour*\n\nRien de nouveau aujourd'hui.")
+        send_message(bot_token, chat_id, "🤖 <b>Rapport du jour</b>\n\nRien de nouveau aujourd'hui.")
         return
 
     send_message(
         bot_token, chat_id,
-        f"🤖 *Rapport du jour*\n\n✅ {len(postuler)} à postuler\n🤔 {len(peut_etre)} peut-être",
+        f"🤖 <b>Rapport du jour</b>\n\n✅ {len(postuler)} à postuler\n🤔 {len(peut_etre)} peut-être",
     )
 
     for entry in postuler:
         label = SUBJECT_LABELS.get(entry["subject"], entry["subject"])
         send_message(
             bot_token, chat_id,
-            f"✅ *POSTULER — {entry['score']}/10* ({label})\n"
-            f"[{entry['summary']}]({entry['url']})\n"
-            f"_{entry['explanation']}_"
+            f"✅ <b>POSTULER — {entry['score']}/10</b> ({label})\n"
+            f"<a href=\"{html.escape(entry['url'])}\">{html.escape(entry['summary'])}</a>\n"
+            f"<i>{html.escape(entry['explanation'])}</i>"
         )
 
     for entry in peut_etre:
         label = SUBJECT_LABELS.get(entry["subject"], entry["subject"])
         send_message(
             bot_token, chat_id,
-            f"🤔 *PEUT-ÊTRE — {entry['score']}/10* ({label})\n"
-            f"[{entry['summary']}]({entry['url']})\n"
-            f"_{entry['explanation']}_"
+            f"🤔 <b>PEUT-ÊTRE — {entry['score']}/10</b> ({label})\n"
+            f"<a href=\"{html.escape(entry['url'])}\">{html.escape(entry['summary'])}</a>\n"
+            f"<i>{html.escape(entry['explanation'])}</i>"
         )
 
     print("Telegram notifications sent!")
