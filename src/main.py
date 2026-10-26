@@ -24,7 +24,7 @@ def run_source(page, user: config.UserConfig, source: config.SourceConfig) -> li
         item for item in items
         if not database.is_seen(user.id, source.id, source.source_def.item_key(item))
     ]
-    print(f"[{user.id}/{source.id}] {len(items)} trouvés, {len(new_items)} nouveaux à évaluer")
+    print(f"[{user.id}/{source.id}] {len(items)} found, {len(new_items)} new to evaluate")
 
     # One request for the whole batch; if it raises, nothing is marked seen and
     # every item is retried on the next run.
@@ -68,7 +68,7 @@ def run_user(browser, user: config.UserConfig) -> bool:
         reporter_telegram.send_report(bot_token, chat_id, all_evaluated)
 
     path = results_writer.write_markdown(user.id, all_evaluated)
-    print(f"[{user.id}] Résultats sauvegardés dans {path}")
+    print(f"[{user.id}] Results saved to {path}")
     return ok
 
 

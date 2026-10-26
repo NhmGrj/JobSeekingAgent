@@ -123,3 +123,13 @@ Décision (avec l'utilisateur) : retenter largement les erreurs serveur passagè
 - Workflow : `timeout-minutes: 120` sur le job (scraping ~15 min + 1 h de retries), en garde-fou.
 
 Testé en local avec un faux client et une fausse horloge : succès après trois 503, abandon à ~61 min après 8 tentatives sur 503 permanent, 429 levé immédiatement.
+
+## 2026-10-26 — Projet recentré sur WTTJ, tout passe en anglais
+
+- Suppression de `src/sources/bienici_apartments.py` (stub jamais branché) et de sa mention dans `config.py`. Le projet se concentre sur l'emploi : WTTJ aujourd'hui, des plateformes d'offres freelance plus tard. Les sujets possibles deviennent `"jobs"` et `"freelance"` (libellé Telegram « 🧑‍💻 Freelance » ajouté).
+- Tout le texte est en anglais : logs, messages d'erreur, notifications Telegram (« Daily report », « ⚠️ Error — … »), rapport markdown, prompt et critères Gemini (les explications de Gemini arrivent donc en anglais).
+- Verdicts : `POSTULER` / `PEUT-ÊTRE` / `IGNORER` → `APPLY` / `MAYBE` / `SKIP` (schéma JSON, Telegram, markdown). `ERREUR` retiré de `VERDICT_ORDER`, il n'est plus produit. La base `seen_items` ne stocke pas les verdicts : aucune migration nécessaire.
+- Critères WTTJ : salaire minimum relevé de 50 000 € à **60 000 €** brut annuel. Retrait du bloc « réponds en JSON avec ce format » (format d'une seule offre, contradictoire avec l'évaluation en lot ; le schéma JSON impose déjà la sortie).
+- `src/core/reporter_notion.py` : conservé (retour possible sur Notion) mais non branché. Traduit aussi ; les noms de colonnes ne correspondent donc plus à l'ancienne base Notion. Un commentaire TODO en tête du fichier liste les correspondances à corriger.
+
+Testé en local avec un faux Gemini (503 puis réponse dans le désordre) et un faux Telegram : rapport, alerte d'erreur et markdown corrects en anglais, schéma limité aux nouveaux verdicts. Pas encore de vrai run.

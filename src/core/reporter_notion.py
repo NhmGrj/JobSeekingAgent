@@ -5,6 +5,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Not wired into main.py — kept for a possible return to Notion.
+# TODO when re-enabling: property names and select values were translated to English
+# (2026-10-26) and no longer match the existing Notion database. Rename its columns
+# (or these keys) before use:
+#   Titre -> Title, Entreprise -> Company, Localisation -> Location, Contrat -> Contract,
+#   Télétravail -> Remote, Statut -> Status, Analyse -> Analysis
+#   Status options: "À postuler" -> "To apply", "À évaluer" -> "To review"
+#   Verdict options: POSTULER/PEUT-ÊTRE -> APPLY/MAYBE
+
 NOTION_TOKEN = os.getenv("NOTION_TOKEN")
 NOTION_DATABASE_ID = os.getenv("NOTION_DATABASE_ID")
 
@@ -16,18 +25,18 @@ HEADERS = {
 
 def append_jobs(results: list[tuple]) -> None:
     for job, result in results:
-        if result["verdict"] not in ["POSTULER", "PEUT-ÊTRE"]:
+        if result["verdict"] not in ["APPLY", "MAYBE"]:
             continue
 
-        statut = "À postuler" if result["verdict"] == "POSTULER" else "À évaluer"
+        status = "To apply" if result["verdict"] == "APPLY" else "To review"
 
         payload = {
             "parent": {"database_id": NOTION_DATABASE_ID},
             "properties": {
-                "Titre": {
+                "Title": {
                     "title": [{"text": {"content": job["title"]}}]
                 },
-                "Entreprise": {
+                "Company": {
                     "rich_text": [{"text": {"content": job["company"]}}]
                 },
                 "Score": {
@@ -36,22 +45,22 @@ def append_jobs(results: list[tuple]) -> None:
                 "Verdict": {
                     "select": {"name": result["verdict"]}
                 },
-                "Localisation": {
+                "Location": {
                     "rich_text": [{"text": {"content": job["location"]}}]
                 },
-                "Contrat": {
+                "Contract": {
                     "rich_text": [{"text": {"content": job["contract"]}}]
                 },
-                "Télétravail": {
+                "Remote": {
                     "rich_text": [{"text": {"content": job["remote"]}}]
                 },
                 "URL": {
                     "url": job["url"]
                 },
-                "Statut": {
-                    "select": {"name": statut}
+                "Status": {
+                    "select": {"name": status}
                 },
-                "Analyse": {
+                "Analysis": {
                     "rich_text": [{"text": {"content": result["explanation"]}}]
                 },
                 "Date": {

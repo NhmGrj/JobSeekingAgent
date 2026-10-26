@@ -21,7 +21,7 @@ RESPONSE_SCHEMA = {
             "index": {"type": "integer"},
             "score": {"type": "integer", "minimum": 1, "maximum": 10},
             "explanation": {"type": "string"},
-            "verdict": {"type": "string", "enum": ["POSTULER", "PEUT-ÊTRE", "IGNORER"]},
+            "verdict": {"type": "string", "enum": ["APPLY", "MAYBE", "SKIP"]},
         },
         "required": ["index", "score", "explanation", "verdict"],
     },
@@ -63,10 +63,10 @@ def _generate_with_retry(prompt: str, criteria: str):
             elapsed = time.monotonic() - start
             if elapsed >= RETRY_BUDGET_SECONDS:
                 raise RuntimeError(
-                    f"Gemini indisponible depuis {round(elapsed / 60)} min "
-                    f"({attempt} tentatives), abandon pour aujourd'hui. Dernière erreur : {e}"
+                    f"Gemini unavailable for {round(elapsed / 60)} min "
+                    f"({attempt} attempts), giving up for today. Last error: {e}"
                 ) from e
-            print(f"Gemini {e.code} (tentative {attempt}), nouvel essai dans {delay // 60} min")
+            print(f"Gemini {e.code} (attempt {attempt}), retrying in {delay // 60} min")
             time.sleep(delay)
 
 
@@ -83,15 +83,15 @@ def evaluate_items(items: list[dict], criteria: str) -> list[dict]:
     blocks = []
     for i, item in enumerate(items):
         fields = "\n".join(f"- {k}: {v}" for k, v in item.items())
-        blocks.append(f"### Élément {i}\n{fields}")
+        blocks.append(f"### Item {i}\n{fields}")
     prompt = f"""
-Voici {len(items)} éléments à évaluer, numérotés de 0 à {len(items) - 1} :
+Here are {len(items)} items to evaluate, numbered 0 to {len(items) - 1}:
 
 {chr(10).join(blocks)}
 
-Évalue chaque élément selon les critères fournis. Réponds avec une liste JSON
-contenant un objet par élément, avec son "index", son "score", son "explanation"
-et son "verdict".
+Evaluate each item against the provided criteria. Respond with a JSON list
+containing one object per item, with its "index", "score", "explanation"
+and "verdict".
 """
 
     response = _generate_with_retry(prompt, criteria)
@@ -99,7 +99,7 @@ et son "verdict".
 
     missing = [i for i in range(len(items)) if i not in results]
     if missing:
-        raise ValueError(f"Réponse Gemini incomplète : éléments manquants {missing}")
+        raise ValueError(f"Incomplete Gemini response: missing items {missing}")
 
     return [
         {k: results[i][k] for k in ("score", "explanation", "verdict")}

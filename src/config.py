@@ -8,7 +8,7 @@ from sources.wttj_jobs import SOURCE as WTTJ_JOBS
 @dataclass(frozen=True)
 class SourceConfig:
     id: str                        # e.g. "wttj_jobs" — used as source_id in the dedup key
-    subject: str                   # "jobs" | "apartments" — report section label
+    subject: str                   # "jobs" | "freelance" — report section label
     search_url: str
     criteria: str                  # evaluator system prompt for this source instance
     credentials_env: dict[str, str]  # e.g. {"email": "WTTJ_EMAIL", "password": "WTTJ_PASSWORD"} — env var NAMES, not values
@@ -50,8 +50,6 @@ USERS: list[UserConfig] = [
                 credentials_env={"email": "WTTJ_EMAIL", "password": "WTTJ_PASSWORD"},
                 source_def=WTTJ_JOBS,
             ),
-            # Bien'ici apartments: add a SourceConfig here once sources/bienici_apartments.py
-            # is actually implemented (currently a NotImplementedError stub).
         ],
     ),
     # A second user (own credentials, own Telegram destination) goes here, e.g.:
