@@ -112,3 +112,14 @@ Décision (avec l'utilisateur) :
 Choix volontaire : pas de retry ni de fallback vers un autre modèle pour l'instant. On voit les erreurs arriver sur Telegram, puis on décide.
 
 Testé en local : réponse simulée (ordre mélangé), réponse incomplète, et vraie erreur API (fausse clé). Pas encore de vrai run, quota du jour épuisé.
+
+## 2026-10-26 — Retry Gemini sur 5xx pendant 1 h
+
+Run planifié `40192355975` (2026-10-25) : login et scraping WTTJ OK, mais Gemini a répondu `503 UNAVAILABLE` (« high demand ») et, sans retry depuis le commit précédent, l'erreur est partie directement sur Telegram.
+
+Décision (avec l'utilisateur) : retenter largement les erreurs serveur passagères, et n'alerter que si ça dure.
+- `src/core/evaluator.py` : `_generate_with_retry()` retente les codes 500/503/504 avec des pauses de 1, 2, 4, 8 puis 15 min, jusqu'à 1 h après la première tentative (8 tentatives au plus, donc 8 requêtes sur le quota de 20/jour). Au-delà, une `RuntimeError` « Gemini indisponible depuis N min… » est levée : le ⚠️ part sur Telegram, rien n'est marqué vu, on réessaie au run du lendemain. Les autres erreurs (429 quota, clé invalide, JSON…) ne sont pas retentées.
+- 1 h plutôt que 2 h : les pics de 503 durent en général quelques minutes. Au-delà d'une heure, c'est plutôt une panne longue, les offres sont de toute façon reprises le lendemain, et 2 h ne ferait que retarder l'alerte.
+- Workflow : `timeout-minutes: 120` sur le job (scraping ~15 min + 1 h de retries), en garde-fou.
+
+Testé en local avec un faux client et une fausse horloge : succès après trois 503, abandon à ~61 min après 8 tentatives sur 503 permanent, 429 levé immédiatement.

@@ -1,9 +1,17 @@
 from google import genai
-from google.genai import types
+from google.genai import errors, types
 import os
 import json
+import time
 
 MODEL = "gemini-3.8-flash"
+
+# Gemini's free tier regularly answers 503 "high demand"; these spikes are
+# transient, so we keep retrying for up to an hour before giving up for the day.
+RETRY_CODES = {500, 503, 504}
+RETRY_BUDGET_SECONDS = 60 * 60
+RETRY_DELAYS_SECONDS = [60, 120, 240, 480]  # then RETRY_MAX_DELAY_SECONDS
+RETRY_MAX_DELAY_SECONDS = 15 * 60
 
 RESPONSE_SCHEMA = {
     "type": "array",
@@ -29,11 +37,45 @@ def _get_client() -> genai.Client:
     return _client
 
 
+def _generate_with_retry(prompt: str, criteria: str):
+    """Calls Gemini, retrying transient server errors (5xx) for up to RETRY_BUDGET_SECONDS.
+
+    Any other error is raised immediately.
+    """
+    start = time.monotonic()
+    attempt = 0
+    while True:
+        attempt += 1
+        try:
+            return _get_client().models.generate_content(
+                model=MODEL,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=criteria,
+                    response_mime_type="application/json",
+                    response_json_schema=RESPONSE_SCHEMA,
+                ),
+            )
+        except errors.APIError as e:
+            if e.code not in RETRY_CODES:
+                raise
+            delay = RETRY_DELAYS_SECONDS[attempt - 1] if attempt <= len(RETRY_DELAYS_SECONDS) else RETRY_MAX_DELAY_SECONDS
+            elapsed = time.monotonic() - start
+            if elapsed >= RETRY_BUDGET_SECONDS:
+                raise RuntimeError(
+                    f"Gemini indisponible depuis {round(elapsed / 60)} min "
+                    f"({attempt} tentatives), abandon pour aujourd'hui. Dernière erreur : {e}"
+                ) from e
+            print(f"Gemini {e.code} (tentative {attempt}), nouvel essai dans {delay // 60} min")
+            time.sleep(delay)
+
+
 def evaluate_items(items: list[dict], criteria: str) -> list[dict]:
     """Evaluates all items in a single request; returns one result per item, in order.
 
-    Raises on any failure (API error, unparseable or incomplete response) so the
-    caller can report it; nothing is retried.
+    Transient Gemini server errors are retried (see _generate_with_retry); any
+    other failure (API error, unparseable or incomplete response) is raised so
+    the caller can report it.
     """
     if not items:
         return []
@@ -52,15 +94,7 @@ contenant un objet par élément, avec son "index", son "score", son "explanatio
 et son "verdict".
 """
 
-    response = _get_client().models.generate_content(
-        model=MODEL,
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            system_instruction=criteria,
-            response_mime_type="application/json",
-            response_json_schema=RESPONSE_SCHEMA,
-        ),
-    )
+    response = _generate_with_retry(prompt, criteria)
     results = {r["index"]: r for r in json.loads(response.text)}
 
     missing = [i for i in range(len(items)) if i not in results]
