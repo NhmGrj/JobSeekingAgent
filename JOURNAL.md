@@ -133,3 +133,13 @@ Testé en local avec un faux client et une fausse horloge : succès après trois
 - `src/core/reporter_notion.py` : conservé (retour possible sur Notion) mais non branché. Traduit aussi ; les noms de colonnes ne correspondent donc plus à l'ancienne base Notion. Un commentaire TODO en tête du fichier liste les correspondances à corriger.
 
 Testé en local avec un faux Gemini (503 puis réponse dans le désordre) et un faux Telegram : rapport, alerte d'erreur et markdown corrects en anglais, schéma limité aux nouveaux verdicts. Pas encore de vrai run.
+
+## 2026-10-26 — Plan des chantiers multi-plateformes (CDI + freelance)
+
+Ajout de `CHANTIERS.md` : plan pour brancher d'autres plateformes que WTTJ, sur deux fronts (confirmé par l'utilisateur). Indeed et LinkedIn sont mis de côté.
+- Partie A, CDI : chantier 0 anti-doublons entre plateformes (mis de côté jusqu'à ce que deux plateformes tournent) ; chantier 1 France Travail via l'API officielle (en attente des clés) ; chantier 2 APEC et Hellowork via leurs alertes e-mail (lecture IMAP d'une boîte Gmail dédiée).
+- Partie B, freelance : chantier 3 Free-Work en scraping ; chantier 4 Malt, Comet, Crème de la Crème et Collective via leurs notifications e-mail (même mécanisme que le chantier 2).
+- Repérage : l'APEC renvoie 403 aux navigateurs automatisés, et le `robots.txt` de Hellowork interdit `/fr-fr/emploi/recherche.html`. Règle retenue : ne pas contourner les protections anti-robot, respecter `robots.txt`, passer par les alertes e-mail quand l'accès automatisé est fermé. Le `robots.txt` de Free-Work autorise la recherche.
+- Critères freelance fixés avec l'utilisateur (TJM HT : plancher 500 €, cible 600 – 650 €, très bien au-delà de 700 €, TJM absent = pas de pénalité ; ESN acceptées ; Paris ou remote ; pas de durée minimum…), avec la version anglaise du prompt Gemini prête pour le chantier 3.
+
+Ordre : chantier 3 d'abord (rien à attendre), chantier 1 dès que les clés France Travail sont là.
